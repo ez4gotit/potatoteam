@@ -1,0 +1,81 @@
+- hosts: all 
+  become: true
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg-agent
+          - software-properties-common
+          - python3-pip 
+        state: present
+    - name: install pre-requisites using pip
+      pip:
+        name:
+          - openshift
+          - pyyaml
+          - kubernetes
+        executable: pip3
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
+        state: present
+    - name: Install Docker CE
+      apt:
+        name: docker-ce
+        state: present
+        update_cache: yes
+    - name: Download minikube
+      get_url:
+        url: https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        dest: /usr/local/bin/minikube
+        mode: '0755'
+        
+    - name: Start minikube
+      shell: minikube start --nodes=1 --force 
+            
+    - name: Start minikube tunnel in background
+      shell: nohup minikube tunnel &> /dev/null &
+      async: 10
+      poll: 0
+
+    - name: Deploy Minecraft server pod
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          - apiVersion: v1
+            kind: Pod
+            metadata:
+              namespace: default
+              name: mc-server
+              labels:
+                app: minecraft
+            spec:
+              containers:
+              - name: minecraft
+                image: marctv/minecraft-papermc-server
+                ports:
+                - containerPort: 25565
+          - apiVersion: v1
+            kind: Service
+            metadata:
+              name: mc-service
+              namespace: default
+            spec:
+              type: NodePort
+              ports:
+                - port: 25565
+                  targetPort: 25565
+                  nodePort: 32443
+              selector:
+                app: minecraft
