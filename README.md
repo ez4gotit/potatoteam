@@ -2,7 +2,6 @@
 ### Tool for automatic deployment of a minecraft server 
 
 
-
 ## Installation
 For simpliest installation you just need to:
 
